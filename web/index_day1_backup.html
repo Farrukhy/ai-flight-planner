@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Flight Planner</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    #map { height: 100vh; } /* full-screen map */
+    body { margin: 0; background: #121212; color: white; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    // 1. Initialize map centered on Seoul
+    const map = L.map('map').setView([37.5665, 126.9780], 12);
+
+    // 2. Dark basemap
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 3. On click, show coordinates
+    map.on('click', function(e) {
+      alert("You clicked at: " + e.latlng.lat + ", " + e.latlng.lng);
+    });
+
+    // Replace with your Google API key
+    const API_KEY = "AIzaSyCmNLDmIYc6YHaLxZmVXcgrYlZL3WaK500";
+
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      fetch(`https://maps.googleapis.com/maps/api/elevation/json?locations=${lat},${lng}&key=${API_KEY}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results && data.results.length > 0) {
+            const elevation = data.results[0].elevation.toFixed(2);
+            L.popup()
+              .setLatLng(e.latlng)
+              .setContent(`Elevation: ${elevation} meters`)
+              .openOn(map);
+          }
+        });
+    });
+
+
+  </script>
+</body>
+</html>
