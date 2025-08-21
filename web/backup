@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Elevation Profile Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { 
+            margin: 0; 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #1a1a1a; 
+            color: #fff;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        #map { 
+            flex: 1;
+            height: 100vh; 
+        }
+        .sidebar {
+            width: 450px;
+            background: #2d2d2d;
+            padding: 15px;
+            overflow-y: auto;
+            border-left: 2px solid #444;
+            resize: horizontal;
+            min-width: 300px;
+            max-width: 600px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .clear-btn { background: #f44336; }
+        .clear-btn:hover { background: #da190b; }
+        .status {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        #elevationChart {
+            width: 100%;
+            height: 300px;
+            background: #333;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .stat-box {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .instructions {
+            background: #444;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <h2>🏔️ Elevation Profile</h2>
+            
+            <div class="instructions">
+                <strong>How to use:</strong><br>
+                1. Click "Start Drawing" <br>
+                2. Click 2 points on map<br>
+                3. View elevation profile!
+            </div>
+            
+            <div class="controls">
+                <button id="startDrawing">Start Drawing Line</button>
+                <button id="clearLine" class="clear-btn">Clear Line</button>
+            </div>
+            
+            <div id="status" class="status">
+                Ready to draw. Click "Start Drawing" then click 2 points on the map.
+            </div>
+            
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-box">
+                    <div class="stat-value" id="distance">-</div>
+                    <div>Distance (km)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="maxElev">-</div>
+                    <div>Max Elevation (m)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="minElev">-</div>
+                    <div>Min Elevation (m)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="elevGain">-</div>
+                    <div>Elevation Gain (m)</div>
+                </div>
+            </div>
+            
+            <canvas id="elevationChart" style="display: none;"></canvas>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([37.5665, 126.9780], 12);
+        
+        // Dark theme tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // State management
+        let isDrawing = false;
+        let points = [];
+        let currentLine = null;
+        let markers = [];
+        let elevationChart = null;
+
+        // DOM elements
+        const startBtn = document.getElementById('startDrawing');
+        const clearBtn = document.getElementById('clearLine');
+        const status = document.getElementById('status');
+        const statsDiv = document.getElementById('stats');
+        const chartCanvas = document.getElementById('elevationChart');
+
+        // Button handlers
+        startBtn.addEventListener('click', () => {
+            isDrawing = true;
+            points = [];
+            clearPreviousLine();
+            startBtn.disabled = true;
+            startBtn.textContent = 'Drawing...';
+            map.getContainer().style.cursor = 'crosshair';
+            updateStatus('🎯 Click anywhere on the MAP to place 2 points...');
+        });
+
+        clearBtn.addEventListener('click', () => {
+            clearPreviousLine();
+            isDrawing = false;
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Drawing Line';
+            map.getContainer().style.cursor = '';
+            updateStatus('Ready to draw. Click "Start Drawing" then click 2 points.');
+        });
+
+        // Clear previous line without affecting drawing state
+        function clearPreviousLine() {
+            if (currentLine) {
+                map.removeLayer(currentLine);
+                currentLine = null;
+            }
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            points = [];
+            
+            // Hide stats and chart
+            statsDiv.style.display = 'none';
+            chartCanvas.style.display = 'none';
+            if (elevationChart) {
+                elevationChart.destroy();
+                elevationChart = null;
+            }
+        }
+
+        // Map click handler
+        map.on('click', (e) => {
+            if (!isDrawing) {
+                updateStatus('⚠️ Click "Start Drawing Line" first!');
+                return;
+            }
+            
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            points.push([lat, lng]);
+            
+            // Add marker
+            const marker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: `<div style="background: #ff6b6b; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: white;">${points.length}</div>`,
+                    className: 'custom-marker',
+                    iconSize: [20, 20]
+                })
+            }).addTo(map);
+            markers.push(marker);
+            
+            updateStatus(`Point ${points.length} selected: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            
+            if (points.length === 2) {
+                drawLineAndGetElevation();
+            }
+        });
+
+        function drawLineAndGetElevation() {
+            isDrawing = false;
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Drawing Line';
+            map.getContainer().style.cursor = '';
+            
+            // Draw line
+            currentLine = L.polyline(points, {
+                color: '#ff6b6b',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Fit map to line
+            map.fitBounds(currentLine.getBounds(), { padding: [20, 20] });
+            
+            updateStatus('🔄 Fetching elevation data...');
+            fetchElevationProfile();
+        }
+
+        async function fetchElevationProfile() {
+            try {
+                // Create 11 points along the line for elevation profile
+                const linePoints = interpolatePoints(points[0], points[1], 10);
+                
+                updateStatus(`🔄 Fetching elevation for ${linePoints.length} points...`);
+                
+                // Simulate elevation data (for demo - replace with real API)
+                const elevationData = generateDemoElevationData(linePoints);
+                
+                if (elevationData && elevationData.length > 0) {
+                    displayElevationProfile(elevationData);
+                    updateStatus('✅ Elevation profile ready! (Demo data)');
+                } else {
+                    updateStatus('❌ Failed to get elevation data');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus('❌ Error: ' + error.message);
+            }
+        }
+
+        function interpolatePoints(start, end, numPoints) {
+            const points = [];
+            for (let i = 0; i <= numPoints; i++) {
+                const ratio = i / numPoints;
+                const lat = start[0] + (end[0] - start[0]) * ratio;
+                const lng = start[1] + (end[1] - start[1]) * ratio;
+                points.push([lat, lng]);
+            }
+            return points;
+        }
+
+        function generateDemoElevationData(locations) {
+            return locations.map((location, index) => {
+                // Generate realistic elevation data for Seoul area
+                const baseElevation = 50;
+                const variation = Math.sin(index * 0.8) * 30 + Math.random() * 20;
+                const elevation = Math.max(0, baseElevation + variation);
+                
+                return {
+                    location: location,
+                    elevation: elevation,
+                    distance: calculateDistance(locations[0], location)
+                };
+            });
+        }
+
+        function calculateDistance(point1, point2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (point2[0] - point1[0]) * Math.PI / 180;
+            const dLon = (point2[1] - point1[1]) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(point1[0] * Math.PI / 180) * Math.cos(point2[0] * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function displayElevationProfile(elevationData) {
+            // Calculate stats
+            const elevations = elevationData.map(d => d.elevation);
+            const maxElev = Math.max(...elevations);
+            const minElev = Math.min(...elevations);
+            const totalDistance = elevationData[elevationData.length - 1].distance;
+            const elevGain = elevations[elevations.length - 1] - elevations[0];
+
+            // Update stats
+            document.getElementById('distance').textContent = totalDistance.toFixed(2);
+            document.getElementById('maxElev').textContent = maxElev.toFixed(0);
+            document.getElementById('minElev').textContent = minElev.toFixed(0);
+            document.getElementById('elevGain').textContent = elevGain > 0 ? `+${elevGain.toFixed(0)}` : elevGain.toFixed(0);
+            
+            statsDiv.style.display = 'grid';
+            chartCanvas.style.display = 'block';
+
+            // Create chart
+            const ctx = chartCanvas.getContext('2d');
+            
+            if (elevationChart) {
+                elevationChart.destroy();
+            }
+
+            elevationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: elevationData.map(d => d.distance.toFixed(1)),
+                    datasets: [{
+                        label: 'Elevation (m)',
+                        data: elevationData.map(d => d.elevation),
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                title: (context) => `Distance: ${context[0].label} km`,
+                                label: (context) => `Elevation: ${context.parsed.y.toFixed(0)}m`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Distance (km)',
+                                color: '#fff'
+                            },
+                            ticks: { color: '#ccc' },
+                            grid: { color: '#444' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Elevation (m)',
+                                color: '#fff'
+                            },
+                            ticks: { color: '#ccc' },
+                            grid: { color: '#444' }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        function updateStatus(message) {
+            status.textContent = message;
+        }
+
+        // Initialize
+        updateStatus('Ready! Click "Start Drawing" then click 2 points on the map.');
+    </script>
+</body>
+</html>
