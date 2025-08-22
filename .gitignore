@@ -1,14 +1,19 @@
-venv/
-__pycache__/
-*.pyc
-.env
-*.log
-venv/
-venv/
-__pycache__/
-*.pyc
-venv/
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Python
 venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# Secrets
+backend/.env
