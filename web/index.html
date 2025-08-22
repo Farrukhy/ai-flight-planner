@@ -1,396 +1,299 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Elevation Profile Map</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body { 
-            margin: 0; 
-            font-family: 'Segoe UI', sans-serif; 
-            background: #1a1a1a; 
-            color: #fff;
-        }
-        .container {
-            display: flex;
-            height: 100vh;
-        }
-        #map { 
-            flex: 1;
-            height: 100vh; 
-        }
-        .sidebar {
-            width: 400px;
-            background: #2d2d2d;
-            padding: 20px;
-            overflow-y: auto;
-            border-left: 2px solid #444;
-        }
-        .controls {
-            margin-bottom: 20px;
-        }
-        button {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 5px;
-            font-weight: bold;
-        }
-        button:hover { background: #45a049; }
-        button:disabled { background: #666; cursor: not-allowed; }
-        .clear-btn { background: #f44336; }
-        .clear-btn:hover { background: #da190b; }
-        .status {
-            background: #333;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-family: monospace;
-        }
-        #elevationChart {
-            width: 100%;
-            height: 300px;
-            background: #333;
-            border-radius: 5px;
-            margin-top: 20px;
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 15px 0;
-        }
-        .stat-box {
-            background: #333;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #4CAF50;
-        }
-        .instructions {
-            background: #444;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <title>AI Flight Planner — Day 4–5</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <style>
+    :root { --bg:#0e1320; --fg:#e6edf3; --muted:#9fb0c3; --accent:#4cc3ff; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,Segoe UI,Roboto,Inter;background:var(--bg);color:var(--fg)}
+    header{padding:12px 16px;border-bottom:1px solid #1c2333;display:flex;gap:12px;align-items:center}
+    header h1{font-size:16px;margin:0;font-weight:600}
+    #app{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 50px)}
+    #left{border-right:1px solid #1c2333;padding:14px;overflow:auto}
+    #right{position:relative}
+    #map{position:absolute;inset:0}
+    .card{background:#0f172a;border:1px solid #1c2333;border-radius:12px;padding:12px;margin-bottom:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    textarea,input{width:100%;background:#0b1220;color:var(--fg);border:1px solid #1c2333;border-radius:8px;padding:10px}
+    button{background:var(--accent);color:#001622;border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button.ghost{background:#0b1220;color:var(--fg);border:1px solid #26324a}
+    .small{font-size:12px;color:var(--muted)}
+    .kvs{font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; white-space:pre-wrap}
+    .hr{height:1px;background:#1c2333;margin:10px 0}
+    .ok{color:#2ee6a6}.warn{color:#ffb86b}.bad{color:#ff6b6b}
+    .badge{position:absolute;right:12px;top:12px;background:#111827c0;padding:6px 10px;border:1px solid #26324a;border-radius:8px}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div id="map"></div>
-        
-        <div class="sidebar">
-            <h2>🏔️ Elevation Profile</h2>
-            
-            <div class="instructions">
-                <strong>How to use:</strong><br>
-                1. Click "Start Drawing" <br>
-                2. Click 2 points on map<br>
-                3. View elevation profile!
-            </div>
-            
-            <div class="controls">
-                <button id="startDrawing">Start Drawing Line</button>
-                <button id="clearLine" class="clear-btn">Clear Line</button>
-            </div>
-            
-            <div id="status" class="status">
-                Ready to draw. Click "Start Drawing" then click 2 points on the map.
-            </div>
-            
-            <div class="stats" id="stats" style="display: none;">
-                <div class="stat-box">
-                    <div class="stat-value" id="distance">-</div>
-                    <div>Distance (km)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="maxElev">-</div>
-                    <div>Max Elevation (m)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="minElev">-</div>
-                    <div>Min Elevation (m)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="elevGain">-</div>
-                    <div>Elevation Gain (m)</div>
-                </div>
-            </div>
-            
-            <canvas id="elevationChart" style="display: none;"></canvas>
-        </div>
+<header>
+  <h1>AI Flight Planner — Day 4–5</h1>
+  <span class="badge" id="demoBadge" style="display:none">Demo mode (cached)</span>
+</header>
+
+<div id="app">
+  <section id="left">
+    <div class="card">
+      <strong>Mission Description</strong>
+      <textarea id="mission" placeholder="e.g. Fly to mountain lake, then survey the eastern shore at 120m AGL"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="btnParse">Parse with AI</button>
+        <button class="ghost" id="btnSample">Use Day-4 Test</button>
+      </div>
+      <div class="small" style="margin-top:6px">
+        Day-4 target: “Fly to mountain lake” → AI extracts coords & a label.
+      </div>
+      <div class="hr"></div>
+      <div><strong>Parsed Output</strong></div>
+      <div id="aiOut" class="kvs"></div>
+      <div class="hr"></div>
+      <div><strong>Validation</strong></div>
+      <div id="validate" class="kvs"></div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <script>
-        // Initialize map
-        const map = L.map('map').setView([37.5665, 126.9780], 12);
-        
-        // Dark theme tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
+    <div class="card">
+      <strong>Route & Safety</strong>
+      <div class="small">With terrain on, we check clearance along the path.</div>
+      <div class="row" style="margin-top:8px">
+        <input id="altitude" placeholder="Cruise Altitude AGL (m), e.g. 120" />
+        <input id="buffer" placeholder="Safety Buffer (m), e.g. 30" />
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnRoute">Draw Route</button>
+      </div>
+      <div id="safety" class="small"></div>
+    </div>
 
-        // State management
-        let isDrawing = false;
-        let points = [];
-        let currentLine = null;
-        let markers = [];
-        let elevationChart = null;
+    <div class="card">
+      <strong>Notes</strong>
+      <div class="small">
+        • OpenAI via backend (key hidden).<br/>
+        • MapTiler key restricted by domain; 3D terrain + hillshade + buildings.<br/>
+        • Demo fallback when API is unavailable.
+      </div>
+    </div>
+  </section>
 
-        // DOM elements
-        const startBtn = document.getElementById('startDrawing');
-        const clearBtn = document.getElementById('clearLine');
-        const status = document.getElementById('status');
-        const statsDiv = document.getElementById('stats');
-        const chartCanvas = document.getElementById('elevationChart');
+  <section id="right"><div id="map"></div></section>
+</div>
 
-        // Button handlers
-        startBtn.addEventListener('click', () => {
-            isDrawing = true;
-            points = [];
-            clearPreviousLine();
-            startBtn.disabled = true;
-            startBtn.textContent = 'Drawing...';
-            map.getContainer().style.cursor = 'crosshair';
-            updateStatus('🎯 Click anywhere on the MAP to place 2 points...');
+<script>
+const $ = id => document.getElementById(id);
+const state = { waypoints: [], config: null };
+const SYSTEM_PROMPT = `You extract geographic targets from free-text mission descriptions.
+Return strict JSON:
+{"targets":[{"name":"label","lat":12.34,"lon":56.78}, ...]}
+- If coords not present, infer the single best place.
+- Decimal degrees only; lat[-90..90], lon[-180..180].`;
+
+/* -------- boot -------- */
+(async function boot(){
+  // fetch config (includes map style + whether terrain is enabled)
+  const r = await fetch('/api/config');
+  state.config = await r.json();
+  bootMap();
+})();
+
+/* -------- Map -------- */
+let map;
+function bootMap(){
+  const styleUrl = state.config.mapStyleUrl; // already includes key & chosen style
+  map = new maplibregl.Map({
+    container: 'map',
+    style: styleUrl,
+    center: [127.0, 37.5], zoom: 6, pitch: 60, bearing: -30
+  });
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  map.on('load', () => {
+    if (state.config.terrainDemUrl) {
+      if (!map.getSource('terrain')) {
+        map.addSource('terrain', { type:'raster-dem', url: state.config.terrainDemUrl, tileSize:256 });
+      }
+      map.setTerrain({ source:'terrain', exaggeration: 1.5 });
+
+      // hillshade (visual relief)
+      if (!map.getLayer('hillshade')) {
+        map.addLayer({ id:'hillshade', type:'hillshade', source:'terrain',
+          paint:{ 'hillshade-exaggeration': 0.6 } }, undefined);
+      }
+    }
+
+    // 3D buildings if style exposes OpenMapTiles 'building'
+    if (!map.getLayer('3d-buildings')) {
+      try {
+        map.addLayer({
+          id:'3d-buildings',
+          type:'fill-extrusion',
+          source:'openmaptiles',
+          'source-layer':'building',
+          minzoom:14,
+          paint:{
+            'fill-extrusion-color':'#d1d5db',
+            'fill-extrusion-height':['coalesce',['get','height'],12],
+            'fill-extrusion-base':['coalesce',['get','min_height'],0],
+            'fill-extrusion-opacity':0.8
+          }
         });
+      } catch(_) {/* style may not have openmaptiles; ignore */}
+    }
+  });
+}
 
-        clearBtn.addEventListener('click', () => {
-            clearPreviousLine();
-            isDrawing = false;
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Drawing Line';
-            map.getContainer().style.cursor = '';
-            updateStatus('Ready to draw. Click "Start Drawing" then click 2 points.');
-        });
+/* -------- Helpers -------- */
+function fromTextHeuristics(s){
+  const out=[]; let m;
+  const decRe=/([-+]?(\d{1,2}(?:\.\d+)?))\s*[, ]\s*([-+]?(?:1[0-7]\d|\d{1,2})(?:\.\d+)?)/g;
+  while((m=decRe.exec(s))!==null){ const lat=+m[1], lon=+m[3]; if(Math.abs(lat)<=90&&Math.abs(lon)<=180) out.push({name:'coord',lat,lon}); }
+  const gRe=/@(-?\d{1,2}\.\d+),(-?1?\d{1,2}\.\d+)/g;
+  while((m=gRe.exec(s))!==null) out.push({name:'map-link',lat:+m[1],lon:+m[2]});
+  const dms=/(\d{1,3})[°\s]\s*(\d{1,2})['\s]\s*(\d{1,2}(?:\.\d+)?)"?\s*([NS])[, ]+\s*(\d{1,3})[°\s]\s*(\d{1,2})['\s]\s*(\d{1,2}(?:\.\d+)?)"?\s*([EW])/ig;
+  while((m=dms.exec(s))!==null){
+    const lat=(+m[1]+m[2]/60+m[3]/3600)*(m[4].toUpperCase()==='S'?-1:1);
+    const lon=(+m[5]+m[6]/60+m[7]/3600)*(m[8].toUpperCase()==='W'?-1:1);
+    out.push({name:'dms',lat,lon});
+  }
+  return out;
+}
+function validateWaypoints(list){
+  const msgs=[], ok=[], seen=new Set();
+  for(const p of list||[]){
+    const lat=+p.lat, lon=+p.lon;
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)){ msgs.push(`❌ Non-numeric: ${JSON.stringify(p)}`); continue; }
+    if(Math.abs(lat)>90||Math.abs(lon)>180){ msgs.push(`❌ Out of range: ${lat}, ${lon}`); continue; }
+    const key=lat.toFixed(6)+","+lon.toFixed(6);
+    if(seen.has(key)){ msgs.push(`⚠️ Duplicate ignored: ${key}`); continue; }
+    seen.add(key); ok.push({name:p.name||"wp",lat,lon});
+  }
+  return {ok,msgs};
+}
+function flyTo(p){ map && map.flyTo({center:[p.lon,p.lat], zoom: 10}); }
 
-        // Clear previous line without affecting drawing state
-        function clearPreviousLine() {
-            if (currentLine) {
-                map.removeLayer(currentLine);
-                currentLine = null;
-            }
-            markers.forEach(marker => map.removeLayer(marker));
-            markers = [];
-            points = [];
-            
-            // Hide stats and chart
-            statsDiv.style.display = 'none';
-            chartCanvas.style.display = 'none';
-            if (elevationChart) {
-                elevationChart.destroy();
-                elevationChart = null;
-            }
-        }
+/* -------- Backend call with retry -------- */
+async function callParseAPI(payload, maxRetries=2){
+  let attempt=0;
+  while(true){
+    const r = await fetch('/api/parse', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(r.status!==429) return r;
+    attempt++; if(attempt>maxRetries) return r;
+    const retryAfter=parseFloat(r.headers.get('retry-after')||'0');
+    await new Promise(res=>setTimeout(res, (retryAfter?retryAfter*1000:1500*attempt)));
+  }
+}
 
-        // Map click handler
-        map.on('click', (e) => {
-            if (!isDrawing) {
-                updateStatus('⚠️ Click "Start Drawing Line" first!');
-                return;
-            }
-            
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            points.push([lat, lng]);
-            
-            // Add marker
-            const marker = L.marker([lat, lng], {
-                icon: L.divIcon({
-                    html: `<div style="background: #ff6b6b; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: white;">${points.length}</div>`,
-                    className: 'custom-marker',
-                    iconSize: [20, 20]
-                })
-            }).addTo(map);
-            markers.push(marker);
-            
-            updateStatus(`Point ${points.length} selected: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-            
-            if (points.length === 2) {
-                drawLineAndGetElevation();
-            }
-        });
+/* -------- Day 4: Parse -------- */
+$('btnSample').onclick = ()=>{ $('mission').value = "Fly to mountain lake"; };
+$('btnParse').onclick = async ()=>{
+  const btn=$('btnParse'); if(btn.dataset.busy==='1') return;
+  btn.dataset.busy='1'; btn.textContent='Parsing…';
+  $('aiOut').textContent=''; $('validate').textContent='';
 
-        function drawLineAndGetElevation() {
-            isDrawing = false;
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Drawing Line';
-            map.getContainer().style.cursor = '';
-            
-            // Draw line
-            currentLine = L.polyline(points, {
-                color: '#ff6b6b',
-                weight: 4,
-                opacity: 0.8
-            }).addTo(map);
-            
-            // Fit map to line
-            map.fitBounds(currentLine.getBounds(), { padding: [20, 20] });
-            
-            updateStatus('🔄 Fetching elevation data...');
-            fetchElevationProfile();
-        }
+  try{
+    const text=$('mission').value.trim();
+    let waypoints = fromTextHeuristics(text);
 
-        async function fetchElevationProfile() {
-            try {
-                // Create 11 points along the line for elevation profile
-                const linePoints = interpolatePoints(points[0], points[1], 10);
-                
-                updateStatus(`🔄 Fetching elevation for ${linePoints.length} points...`);
-                
-                // Simulate elevation data (for demo - replace with real API)
-                const elevationData = generateDemoElevationData(linePoints);
-                
-                if (elevationData && elevationData.length > 0) {
-                    displayElevationProfile(elevationData);
-                    updateStatus('✅ Elevation profile ready! (Demo data)');
-                } else {
-                    updateStatus('❌ Failed to get elevation data');
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                updateStatus('❌ Error: ' + error.message);
-            }
-        }
+    const r = await callParseAPI({
+      system: SYSTEM_PROMPT,
+      user: text
+    });
+    if(!r.ok){
+      // demo fallback on rate-limit / no quota
+      const msg = await r.text();
+      $('demoBadge').style.display='block';
+      const demo = { targets:[{name:"Mountain Lake (demo)", lat:37.59, lon:127.27}] };
+      $('aiOut').textContent = `API unavailable → using demo:\n${JSON.stringify(demo,null,2)}\n\nDetail:\n${msg}`;
+      waypoints = demo.targets;
+    }else{
+      $('demoBadge').style.display='none';
+      const data = await r.json();
+      const targets = data.targets||[];
+      waypoints.push(...targets);
+      $('aiOut').textContent = JSON.stringify(waypoints,null,2);
+    }
 
-        function interpolatePoints(start, end, numPoints) {
-            const points = [];
-            for (let i = 0; i <= numPoints; i++) {
-                const ratio = i / numPoints;
-                const lat = start[0] + (end[0] - start[0]) * ratio;
-                const lng = start[1] + (end[1] - start[1]) * ratio;
-                points.push([lat, lng]);
-            }
-            return points;
-        }
+    const {ok,msgs}=validateWaypoints(waypoints);
+    state.waypoints = ok;
+    $('validate').innerHTML = (msgs.length? msgs.join('\n') : '✅ Looks good.') + `\nParsed ${ok.length} waypoint(s).`;
+    if(ok.length) flyTo(ok[0]);
 
-        function generateDemoElevationData(locations) {
-            return locations.map((location, index) => {
-                // Generate realistic elevation data for Seoul area
-                const baseElevation = 50;
-                const variation = Math.sin(index * 0.8) * 30 + Math.random() * 20;
-                const elevation = Math.max(0, baseElevation + variation);
-                
-                return {
-                    location: location,
-                    elevation: elevation,
-                    distance: calculateDistance(locations[0], location)
-                };
-            });
-        }
+  }catch(e){
+    $('aiOut').textContent = String(e);
+  }finally{
+    btn.dataset.busy='0'; btn.textContent='Parse with AI';
+  }
+};
 
-        function calculateDistance(point1, point2) {
-            const R = 6371; // Earth's radius in km
-            const dLat = (point2[0] - point1[0]) * Math.PI / 180;
-            const dLon = (point2[1] - point1[1]) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(point1[0] * Math.PI / 180) * Math.cos(point2[0] * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
+/* -------- Day 5: Route + safety coloring -------- */
+$('btnRoute').onclick = ()=>{
+  if(!map) return;
+  if(state.waypoints.length<2){
+    if(state.waypoints.length===1){
+      const p=state.waypoints[0];
+      state.waypoints.push({name:"offset",lat:p.lat+0.01,lon:p.lon+0.01});
+    }else{ alert('Add at least one waypoint first.'); return; }
+  }
+  const cruise = parseFloat($('altitude').value)||120;
+  const buffer = parseFloat($('buffer').value)||30;
 
-        function displayElevationProfile(elevationData) {
-            // Calculate stats
-            const elevations = elevationData.map(d => d.elevation);
-            const maxElev = Math.max(...elevations);
-            const minElev = Math.min(...elevations);
-            const totalDistance = elevationData[elevationData.length - 1].distance;
-            const elevGain = elevations[elevations.length - 1] - elevations[0];
+  // build samples and classify
+  const coords = state.waypoints.map(wp=>[wp.lon,wp.lat]);
+  const samples=60, pts=[];
+  for(let i=0;i<samples;i++){
+    const t=i/(samples-1);
+    const s=t*(coords.length-1); const idx=Math.min(coords.length-2,Math.floor(s));
+    const a=coords[idx], b=coords[idx+1], tt=s-idx;
+    pts.push([a[0]+(b[0]-a[0])*tt, a[1]+(b[1]-a[1])*tt]);
+  }
+  const supports = typeof map.queryTerrainElevation==='function' && map.getTerrain();
+  const green=[], yellow=[], red=[];
+  let minClear=Infinity, bad=0;
+  for(let i=0;i<pts.length-1;i++){
+    const p=pts[i], q=pts[i+1];
+    let elev=0;
+    if(supports){ elev = map.queryTerrainElevation({lng:p[0], lat:p[1]}) ?? 0; }
+    const clearance = cruise - elev;
+    minClear = Math.min(minClear, clearance);
+    const seg={type:'Feature',geometry:{type:'LineString',coordinates:[p,q]},properties:{}};
+    if(!supports){ green.push(seg); }
+    else if(clearance < buffer){ red.push(seg); bad++; }
+    else if(clearance < buffer*1.5){ yellow.push(seg); }
+    else { green.push(seg); }
+  }
+  // remove old layers
+  for(const id of ['route-green','route-yellow','route-red','route-points']){
+    if(map.getLayer(id)) map.removeLayer(id);
+    if(map.getSource(id)) map.removeSource(id);
+  }
+  function addSeg(id, feats, color){
+    if(!feats.length) return;
+    map.addSource(id,{type:'geojson',data:{type:'FeatureCollection',features:feats}});
+    map.addLayer({id, type:'line', source:id, paint:{'line-color':color,'line-width':5}});
+  }
+  addSeg('route-green', green, '#36d399');
+  addSeg('route-yellow', yellow, '#fbbf24');
+  addSeg('route-red', red, '#f87171');
 
-            // Update stats
-            document.getElementById('distance').textContent = totalDistance.toFixed(2);
-            document.getElementById('maxElev').textContent = maxElev.toFixed(0);
-            document.getElementById('minElev').textContent = minElev.toFixed(0);
-            document.getElementById('elevGain').textContent = elevGain > 0 ? `+${elevGain.toFixed(0)}` : elevGain.toFixed(0);
-            
-            statsDiv.style.display = 'grid';
-            chartCanvas.style.display = 'block';
+  // markers
+  const ptsFC = {type:'FeatureCollection',features:state.waypoints.map(w=>({type:'Feature',geometry:{type:'Point',coordinates:[w.lon,w.lat]},properties:{name:w.name}}))};
+  map.addSource('route-points',{type:'geojson',data:ptsFC});
+  map.addLayer({id:'route-points', type:'circle', source:'route-points',
+    paint:{'circle-radius':5,'circle-color':'#4cc3ff','circle-stroke-color':'#001622','circle-stroke-width':2}});
 
-            // Create chart
-            const ctx = chartCanvas.getContext('2d');
-            
-            if (elevationChart) {
-                elevationChart.destroy();
-            }
-
-            elevationChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: elevationData.map(d => d.distance.toFixed(1)),
-                    datasets: [{
-                        label: 'Elevation (m)',
-                        data: elevationData.map(d => d.elevation),
-                        borderColor: '#4CAF50',
-                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 0,
-                        pointHoverRadius: 5
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleColor: '#fff',
-                            bodyColor: '#fff',
-                            callbacks: {
-                                title: (context) => `Distance: ${context[0].label} km`,
-                                label: (context) => `Elevation: ${context.parsed.y.toFixed(0)}m`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Distance (km)',
-                                color: '#fff'
-                            },
-                            ticks: { color: '#ccc' },
-                            grid: { color: '#444' }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Elevation (m)',
-                                color: '#fff'
-                            },
-                            ticks: { color: '#ccc' },
-                            grid: { color: '#444' }
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    }
-                }
-            });
-        }
-
-        function updateStatus(message) {
-            status.textContent = message;
-        }
-
-        // Initialize
-        updateStatus('Ready! Click "Start Drawing" then click 2 points on the map.');
-    </script>
+  // UI summary
+  if(!supports){
+    $('safety').innerHTML = `<span class="warn">Terrain API not active.</span> Route drawn (visual).`;
+  }else{
+    const status = bad ? `<span class="bad">⚠️ Low-clearance segments: ${bad}/${samples-1}</span>`
+                       : `<span class="ok">✅ All segments clear</span>`;
+    $('safety').innerHTML = `${status} — Min clearance: ${Math.round(minClear)} m (buffer ${buffer} m)`;
+  }
+};
+</script>
 </body>
 </html>
