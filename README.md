@@ -27,3 +27,13 @@ Mission: parse natural-language missions into coordinates and visualize a terrai
 
 ## Repo Structure
 
+
+ai-flight-planner/
+backend/ # Express server (OpenAI proxy + serves /web)
+server.js
+package.json
+.env.example # copy to .env and fill in values
+web/ # Static frontend (index.html + MapLibre app)
+index.html
+README.md
+.gitignore
