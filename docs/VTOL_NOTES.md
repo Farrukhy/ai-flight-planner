@@ -3,7 +3,14 @@
 ## Prompt Example (operator input)
 
 “VTOL VE-20, cruise 100 km/h, climb 3 m/s, min turn radius 120 m, takeoff VTOL to 60 m AGL, transition to FW, land VTOL at <lat,lon>.”
+(Specs, flight time, payload, endurance, range, engine type)
 
+Pick VTOL model → start with spec sheet.
+Endurance (battery/fuel).
+Max payload.
+Max range.
+Cruise speed.
+Ceiling (max altitude).
 
 ## Current Status
 - Code already generates straight-line, fixed-altitude waypoints (demo).
