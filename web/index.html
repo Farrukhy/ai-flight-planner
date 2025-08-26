@@ -88,6 +88,18 @@
       <div id="batteryOut" class="kvs"></div>
     </div>
 
+    <div class="card">
+      <strong>Route Options (Day 8)</strong>
+      <div class="row" style="margin-top:8px">
+        <button id="btnRoutes">Generate Routes</button>
+        <button class="ghost" id="btnPickShortest">Use Shortest</button>
+        <button class="ghost" id="btnPickSafe">Use Safest</button>
+        <button class="ghost" id="btnPickEfficient">Use Efficient</button>
+      </div>
+      <div id="routesTable" class="kvs" style="margin-top:8px"></div>
+    </div>
+
+
 
     <div class="card">
       <strong>Notes</strong>
@@ -164,6 +176,57 @@ function bootMap(){
     }
   });
 }
+function clearRouteOptionLayers(){
+  for(const id of ['opt-shortest','opt-safest','opt-efficient']){
+    if(map.getLayer(id)) map.removeLayer(id);
+    if(map.getSource(id)) map.removeSource(id);
+  }
+}
+
+function drawCandidate(id, coords, color){
+  const geo = { type:'Feature', geometry:{type:'LineString', coordinates:coords} };
+  const src = `opt-${id}`;
+  if(map.getLayer(src)) { map.removeLayer(src); map.removeSource(src); }
+  map.addSource(src,{type:'geojson',data:geo});
+  map.addLayer({id:src,type:'line',source:src,paint:{'line-width':4,'line-color':color}});
+}
+
+$('btnRoutes').onclick = ()=>{
+  if(!state.waypoints || state.waypoints.length<2){
+    alert('Need at least Start and End (click map or parse text).');
+    return;
+  }
+  const cruise = parseFloat($('altitude').value || '120');
+  const buffer = parseFloat($('buffer').value || '30');
+  const opts = routeCandidatesFromWaypoints(state.waypoints,{cruise,buffer});
+  state._candidates = opts;
+
+  clearRouteOptionLayers();
+  for(const r of opts) drawCandidate(r.id, r.coords, r.color);
+
+  // render mini table
+  const lines = [
+    'id        dist   minClr  bad/warn  cruiseUsed',
+    ...opts.map(r => `${r.id.padEnd(9)} ${kmToStr(r.stats.distKm).padEnd(6)} ${(r.stats.minClear??'-').toString().padEnd(6)}  ${String(r.stats.bad).padStart(2)}/${String(r.stats.warn).padEnd(2)}   ${r.stats.cruiseUsed}`)
+  ];
+  $('routesTable').textContent = lines.join('\n');
+};
+
+// pickers
+$('btnPickShortest').onclick = ()=>pickCandidate('shortest');
+$('btnPickSafe').onclick = ()=>pickCandidate('safest');
+$('btnPickEfficient').onclick = ()=>pickCandidate('efficient');
+
+function pickCandidate(id){
+  const c = (state._candidates||[]).find(x=>x.id===id);
+  if(!c) return alert('Generate routes first.');
+  // update active waypoints to chosen coords (keeps downstream logic simple)
+  state.waypoints = wpsFromCoords(c.coords);
+  $('aiOut').textContent = JSON.stringify(state.waypoints,null,2);
+  $('validate').textContent = `✅ Using candidate: ${id}`;
+  // optionally redraw Day-5 safety route using existing “Draw Route” button
+}
+
 
 let clickMode = false;
 let clickPts = []; // [{lat,lon,name}]
@@ -231,6 +294,34 @@ Flight time est: ${(timeHr*60).toFixed(0)} min
 Battery used: ${(totalPct*100).toFixed(0)}%   Remaining: ${(estRemaining*100).toFixed(0)}%`;
 };
 
+function kmToStr(km){ return km.toFixed(1) + " km"; }
+
+function lineSample(coords, n=80){
+  if(coords.length<2) return [];
+  const out=[];
+  for(let i=0;i<n;i++){
+    const t=i/(n-1);
+    const L=coords.length-1, s=t*L, k=Math.min(L-1, Math.floor(s)), u=s-k;
+    const a=coords[k], b=coords[k+1];
+    out.push([ a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u ]);
+  }
+  return out;
+}
+
+function clearanceStats(samples, cruise, buffer){
+  const supports = typeof map.queryTerrainElevation==='function' && map.getTerrain();
+  let bad=0, warn=0, minClear=Infinity;
+  for(let i=0;i<samples.length;i++){
+    const p = samples[i];
+    let elev=0;
+    if(supports) elev = map.queryTerrainElevation({lng:p[0],lat:p[1]}) ?? 0;
+    const cl = cruise - elev;
+    minClear = Math.min(minClear, cl);
+    if(!supports) continue;
+    if(cl < buffer) bad++; else if(cl < buffer*1.5) warn++;
+  }
+  return {bad,warn,minClear:isFinite(minClear)?Math.round(minClear):null};
+}
 
 /* -------- Helpers -------- */
 function fromTextHeuristics(s){
@@ -285,6 +376,51 @@ function routeDistanceKm(pts){
   if(!pts || pts.length<2) return 0;
   let d=0; for(let i=0;i<pts.length-1;i++) d+=havDist(pts[i],pts[i+1]); return d;
 }
+
+
+function routeCandidatesFromWaypoints(wps, opts){
+  const { cruise=120, buffer=30 } = opts||{};
+  if(!wps || wps.length<2) return [];
+
+  // base polyline (straight segments)
+  const coords = wps.map(w=>[w.lon,w.lat]);
+
+  // 1) shortest = the straight baseline
+  const shortest = { id:'shortest', label:'Shortest', color:'#60a5fa', coords:[...coords] };
+
+  // 2) safest (terrain-aware): same geometry but suggests higher cruise if needed
+  // (Detouring would require a pathfinder; this MVP bumps cruise for stats)
+  const safe = { id:'safest', label:'Safest', color:'#34d399', coords:[...coords], cruiseBoost: true };
+
+  // 3) efficient: favors fewer climbs (MVP = slight smoothing)
+  const efficient = { id:'efficient', label:'Efficient', color:'#f59e0b', coords:smoothCoords(coords, 0.25) };
+
+  // compute metrics for each
+  const list = [shortest,safe,efficient].map(r => {
+    const samples = lineSample(r.coords, 80);
+    const useCruise = r.cruiseBoost ? cruise + buffer : cruise;
+    const s = clearanceStats(samples, useCruise, buffer);
+    const distKm = routeDistanceKm(wpsFromCoords(r.coords));
+    return { ...r, stats:{ distKm, ...s, cruiseUsed: useCruise } };
+  });
+
+  return list;
+}
+
+function smoothCoords(coords, alpha=0.3){
+  if(coords.length<=2) return coords;
+  const out = [coords[0]];
+  for(let i=1;i<coords.length-1;i++){
+    const a=coords[i-1], b=coords[i], c=coords[i+1];
+    out.push([ b[0] + alpha*( (a[0]+c[0])/2 - b[0] ), b[1] + alpha*( (a[1]+c[1])/2 - b[1] ) ]);
+  }
+  out.push(coords[coords.length-1]);
+  return out;
+}
+
+function wpsFromCoords(coords){ return coords.map(([lon,lat],i)=>({name:`p${i+1}`,lat,lon})); }
+
+
 
 /* -------- Day 4: Parse -------- */
 $('btnSample').onclick = ()=>{ $('mission').value = "Fly to mountain lake"; };
