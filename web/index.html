@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>AI Flight Planner — Day 4–5</title>
+  <title>AI Flight Planner — Week 2 clean</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <!-- =========================================
+  = CHAPTER 01: Styles & Layout
+  ========================================= -->
   <style>
     :root { --bg:#0e1320; --fg:#e6edf3; --muted:#9fb0c3; --accent:#4cc3ff; }
     *{box-sizing:border-box}
@@ -18,7 +22,7 @@
     #map{position:absolute;inset:0}
     .card{background:#0f172a;border:1px solid #1c2333;border-radius:12px;padding:12px;margin-bottom:12px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    textarea,input{width:100%;background:#0b1220;color:var(--fg);border:1px solid #1c2333;border-radius:8px;padding:10px}
+    textarea,input,select{width:100%;background:#0b1220;color:var(--fg);border:1px solid #1c2333;border-radius:8px;padding:10px}
     button{background:var(--accent);color:#001622;border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
     button.ghost{background:#0b1220;color:var(--fg);border:1px solid #26324a}
     .small{font-size:12px;color:var(--muted)}
@@ -26,19 +30,25 @@
     .hr{height:1px;background:#1c2333;margin:10px 0}
     .ok{color:#2ee6a6}.warn{color:#ffb86b}.bad{color:#ff6b6b}
     .badge{position:absolute;right:12px;top:12px;background:#111827c0;padding:6px 10px;border:1px solid #26324a;border-radius:8px}
+    details > summary{cursor:pointer;list-style:none}
+    details > summary::-webkit-details-marker{display:none}
   </style>
 </head>
 <body>
 <header>
-  <h1>AI Flight Planner — Day 4–5</h1>
+  <h1>AI Flight Planner — Week 2</h1>
   <span class="badge" id="demoBadge" style="display:none">Demo mode (cached)</span>
 </header>
 
 <div id="app">
   <section id="left">
+
+    <!-- =========================================
+    = CHAPTER 02: Sidebar UI — Mission / Parse / Validation
+    ========================================= -->
     <div class="card">
       <strong>Mission Description</strong>
-      <textarea id="mission" placeholder="e.g. Fly to mountain lake, then survey the eastern shore at 120m AGL"></textarea>
+      <textarea id="mission" placeholder="e.g. Fly from Daejeon to Seoul at 120m AGL, photos every 100m."></textarea>
       <div class="row" style="margin-top:8px">
         <button id="btnParse">Parse with AI</button>
         <button class="ghost" id="btnSample">Use Day-4 Test</button>
@@ -59,7 +69,9 @@
       <div id="advOut" class="kvs"></div>
     </div>
 
-
+    <!-- =========================================
+    = CHAPTER 03: Route & Safety (Day 5)
+    ========================================= -->
     <div class="card">
       <strong>Route & Safety</strong>
       <div class="small">With terrain on, we check clearance along the path.</div>
@@ -75,19 +87,27 @@
       <div id="safety" class="small"></div>
     </div>
 
+    <!-- =========================================
+    = CHAPTER 07: Battery (optional)
+    ========================================= -->
     <div class="card">
-      <strong>Battery & Range (VTOL)</strong>
-      <div class="small">Uses vehicle defaults from config. Adjust as needed.</div>
-      <div class="row" style="margin-top:8px">
-        <input id="payloadKg" placeholder="Payload (kg), e.g. 1.0" />
-        <input id="windMS" placeholder="Head/Tailwind (m/s, +head -tail), e.g. 2" />
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button id="btnEstimate">Estimate Battery</button>
-      </div>
-      <div id="batteryOut" class="kvs"></div>
+      <details>
+        <summary><strong>Battery & Range (VTOL)</strong> <span class="small"> (optional)</span></summary>
+        <div class="small">Uses vehicle defaults from config. Adjust as needed.</div>
+        <div class="row" style="margin-top:8px">
+          <input id="payloadKg" placeholder="Payload (kg), e.g. 1.0" />
+          <input id="windMS" placeholder="Head/Tailwind (m/s, +head -tail), e.g. 2" />
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnEstimate">Estimate Battery</button>
+        </div>
+        <div id="batteryOut" class="kvs"></div>
+      </details>
     </div>
 
+    <!-- =========================================
+    = CHAPTER 08: Multi-Route Options (Day 8)
+    ========================================= -->
     <div class="card">
       <strong>Route Options (Day 8)</strong>
       <div class="row" style="margin-top:8px">
@@ -99,6 +119,9 @@
       <div id="routesTable" class="kvs" style="margin-top:8px"></div>
     </div>
 
+    <!-- =========================================
+    = CHAPTER 09: Safety Checklist (Day 9)
+    ========================================= -->
     <div class="card">
       <strong>Safety Checklist (Day 9)</strong>
       <div class="row" style="margin-top:8px">
@@ -108,14 +131,29 @@
       <div id="safetyPanel" class="kvs" style="margin-top:8px"></div>
     </div>
 
+    <!-- =========================================
+    = CHAPTER 10: Export (MP WPL + QGC .plan)
+    ========================================= -->
+    <div class="card">
+      <strong>Export (Day 10)</strong>
+      <div class="row" style="margin-top:8px">
+        <select id="exportFmt">
+          <option value="mp">Mission Planner (.waypoints)</option>
+          <option value="qgc">QGroundControl (.plan)</option>
+        </select>
+        <button id="btnExport">Export</button>
+      </div>
+      <div class="small">Waypoints use current Cruise AGL.</div>
+    </div>
 
-
-
+    <!-- =========================================
+    = Notes
+    ========================================= -->
     <div class="card">
       <strong>Notes</strong>
       <div class="small">
         • OpenAI via backend (key hidden).<br/>
-        • MapTiler key restricted by domain; 3D terrain + hillshade + buildings.<br/>
+        • MapTiler key restricted by domain; 3D terrain + hillshade.<br/>
         • Demo fallback when API is unavailable.
       </div>
     </div>
@@ -124,9 +162,13 @@
   <section id="right"><div id="map"></div></section>
 </div>
 
+<!-- =========================================
+= CHAPTER 04: Boot + Globals
+========================================= -->
 <script>
 const $ = id => document.getElementById(id);
 const state = { waypoints: [], config: null };
+
 const SYSTEM_PROMPT = `You extract geographic targets from free-text mission descriptions.
 Return strict JSON:
 {"targets":[{"name":"label","lat":12.34,"lon":56.78}, ...]}
@@ -135,14 +177,18 @@ Return strict JSON:
 
 /* -------- boot -------- */
 (async function boot(){
-  // fetch config (includes map style + whether terrain is enabled)
   const r = await fetch('/api/config');
   state.config = await r.json();
   bootMap();
 })();
+</script>
 
-/* -------- Map -------- */
+<!-- =========================================
+= CHAPTER 05: Map Setup (style, terrain, controls)
+========================================= -->
+<script>
 let map;
+
 function bootMap(){
   const styleUrl = state.config.mapStyleUrl; // already includes key & chosen style
   map = new maplibregl.Map({
@@ -159,16 +205,17 @@ function bootMap(){
       }
       map.setTerrain({ source:'terrain', exaggeration: 1.5 });
 
-      // hillshade (visual relief)
+      // hillshade
       if (!map.getLayer('hillshade')) {
         map.addLayer({ id:'hillshade', type:'hillshade', source:'terrain',
           paint:{ 'hillshade-exaggeration': 0.6 } }, undefined);
       }
     }
 
-    // 3D buildings if style exposes OpenMapTiles 'building'
-    if (!map.getLayer('3d-buildings')) {
-      try {
+    // 3D buildings ONLY if the style truly has 'openmaptiles'
+    try {
+      const s = map.getStyle();
+      if (s && s.sources && s.sources['openmaptiles'] && !map.getLayer('3d-buildings')) {
         map.addLayer({
           id:'3d-buildings',
           type:'fill-extrusion',
@@ -182,10 +229,12 @@ function bootMap(){
             'fill-extrusion-opacity':0.8
           }
         });
-      } catch(_) {/* style may not have openmaptiles; ignore */}
-    }
+      }
+    } catch(_) {}
   });
 }
+
+/* small utils for candidate layers */
 function clearRouteOptionLayers(){
   for(const id of ['opt-shortest','opt-safest','opt-efficient']){
     if(map.getLayer(id)) map.removeLayer(id);
@@ -193,90 +242,108 @@ function clearRouteOptionLayers(){
   }
 }
 
+/* draw candidate with small offsets + dash so lines never fully overlap */
 function drawCandidate(id, coords, color){
-  const geo = { type:'Feature', geometry:{type:'LineString', coordinates:coords} };
   const src = `opt-${id}`;
+  const geo = { type:'Feature', geometry:{ type:'LineString', coordinates:coords } };
   if(map.getLayer(src)) { map.removeLayer(src); map.removeSource(src); }
-  map.addSource(src,{type:'geojson',data:geo});
-  map.addLayer({id:src,type:'line',source:src,paint:{'line-width':4,'line-color':color}});
+
+  const offsets = { shortest:[0,0], safest:[2,2], efficient:[-2,-2] }[id] || [0,0];
+  const dash = id==='shortest' ? [1,0] : (id==='safest' ? [2,1] : [3,2]);
+
+  map.addSource(src,{ type:'geojson', data: geo });
+  map.addLayer({
+    id: src, type:'line', source: src,
+    paint: { 'line-color': color, 'line-width': 4, 'line-translate': offsets, 'line-dasharray': dash }
+  });
 }
 
-$('btnRoutes').onclick = ()=>{
-  if(!state.waypoints || state.waypoints.length<2){
-    alert('Need at least Start and End (click map or parse text).');
-    return;
-  }
-  const cruise = parseFloat($('altitude').value || '120');
-  const buffer = parseFloat($('buffer').value || '30');
-  const opts = routeCandidatesFromWaypoints(state.waypoints,{cruise,buffer});
-  state._candidates = opts;
+/* pins for Start/End/RTH */
+function drawClickPins(points){
+  const id = 'click-pins';
+  if(map.getLayer(id)) { map.removeLayer(id); map.removeSource(id); }
+  const fc = {
+    type:'FeatureCollection',
+    features: (points||[]).map(p=>({
+      type:'Feature',
+      properties:{label:p.name||''},
+      geometry:{type:'Point', coordinates:[p.lon, p.lat]}
+    }))
+  };
+  map.addSource(id, {type:'geojson', data: fc});
+  map.addLayer({
+    id, type:'symbol', source:id,
+    layout:{
+      'icon-image': 'marker-15',
+      'icon-size': 1.2,
+      'text-field': ['get','label'],
+      'text-size': 12,
+      'text-offset': [0, 1.2],
+      'text-anchor': 'top'
+    },
+    paint:{ 'text-color': '#e6edf3' }
+  });
+}
+</script>
 
-  clearRouteOptionLayers();
-  for(const r of opts) drawCandidate(r.id, r.coords, r.color);
+<!-- =========================================
+= CHAPTER 06: Helpers (distance, sampling, clearance)
+========================================= -->
+<script>
+function havDist(a,b){ // km, simple haversine
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon);
+  const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s1));
+}
+function routeDistanceKm(pts){
+  if(!pts || pts.length<2) return 0;
+  let d=0; for(let i=0;i<pts.length-1;i++) d+=havDist(pts[i],pts[i+1]); return d;
+}
+function kmToStr(km){ return km.toFixed(1) + " km"; }
 
-  // render mini table
-  const lines = [
-    'id        dist   minClr  bad/warn  cruiseUsed',
-    ...opts.map(r => `${r.id.padEnd(9)} ${kmToStr(r.stats.distKm).padEnd(6)} ${(r.stats.minClear??'-').toString().padEnd(6)}  ${String(r.stats.bad).padStart(2)}/${String(r.stats.warn).padEnd(2)}   ${r.stats.cruiseUsed}`)
-  ];
-  $('routesTable').textContent = lines.join('\n');
-};
-
-$('btnCheck').onclick = ()=>{
+function lineSample(coords, n=80){
+  if(coords.length<2) return [];
   const out=[];
-  const minAlt = parseFloat($('minAlt').value || '0');
-  const cruise = parseFloat($('altitude').value || '120');
-  const buffer = parseFloat($('buffer').value || '30');
-
-  if(minAlt && cruise < minAlt){
-    out.push(`❌ Cruise altitude ${cruise}m < minimum ${minAlt}m`);
-  }else if(minAlt){ out.push(`✓ Min altitude satisfied: ${cruise}m ≥ ${minAlt}m`); }
-
-  if(!state.waypoints || state.waypoints.length<2){
-    out.push('❌ Need route waypoints'); $('safetyPanel').textContent = out.join('\n'); return;
+  for(let i=0;i<n;i++){
+    const t=i/(n-1);
+    const L=coords.length-1, s=t*L, k=Math.min(L-1, Math.floor(s)), u=s-k;
+    const a=coords[k], b=coords[k+1];
+    out.push([ a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u ]);
   }
-
-  // Terrain pass along current waypoints
-  const coords = state.waypoints.map(w=>[w.lon,w.lat]);
-  const samples = lineSample(coords, 80);
-  const stats = clearanceStats(samples, cruise, buffer);
-  if(stats.bad>0) out.push(`⚠️ Low-clearance segments: ${stats.bad} (min clr ${stats.minClear}m)`);
-  else out.push(`✓ Clearance OK. Min ${stats.minClear}m`);
-
-  // RTH (if 3 points with last == first)
-  const isRTH = state.waypoints.length>=3 &&
-                Math.abs(state.waypoints[0].lat - state.waypoints.at(-1).lat)<1e-6 &&
-                Math.abs(state.waypoints[0].lon - state.waypoints.at(-1).lon)<1e-6;
-  out.push(isRTH ? '✓ RTH present' : '⚠️ No Return-to-Home waypoint');
-
-  // Basic low-battery trigger using Day-7 calc (re-use estimator)
-  // (quick recompute using default inputs)
-  const VEH = VEHICLE || {cruise_kmh:95, nominal_flight_time_hr:4};
-  const distKm = routeDistanceKm(state.waypoints);
-  const basePct = (VEH.nominal_flight_time_hr>0) ? (distKm / (VEH.cruise_kmh*VEH.nominal_flight_time_hr)) : 1;
-  const used = Math.min(1, basePct);
-  if(used > 0.8) out.push(`⚠️ Battery usage high: ${(used*100).toFixed(0)}% (consider RTH earlier)`); else out.push('✓ Battery margin OK');
-
-  $('safetyPanel').textContent = out.join('\n');
-};
-
-
-// pickers
-$('btnPickShortest').onclick = ()=>pickCandidate('shortest');
-$('btnPickSafe').onclick = ()=>pickCandidate('safest');
-$('btnPickEfficient').onclick = ()=>pickCandidate('efficient');
-
-function pickCandidate(id){
-  const c = (state._candidates||[]).find(x=>x.id===id);
-  if(!c) return alert('Generate routes first.');
-  // update active waypoints to chosen coords (keeps downstream logic simple)
-  state.waypoints = wpsFromCoords(c.coords);
-  $('aiOut').textContent = JSON.stringify(state.waypoints,null,2);
-  $('validate').textContent = `✅ Using candidate: ${id}`;
-  // optionally redraw Day-5 safety route using existing “Draw Route” button
+  return out;
 }
+function clearanceStats(samples, cruise, buffer){
+  const supports = typeof map.queryTerrainElevation==='function' && map.getTerrain();
+  let bad=0, warn=0, minClear=Infinity;
+  for(let i=0;i<samples.length;i++){
+    const p = samples[i];
+    let elev=0;
+    if(supports) elev = map.queryTerrainElevation({lng:p[0],lat:p[1]}) ?? 0;
+    const cl = cruise - elev;
+    minClear = Math.min(minClear, cl);
+    if(!supports) continue;
+    if(cl < buffer) bad++; else if(cl < buffer*1.5) warn++;
+  }
+  return {bad,warn,minClear:isFinite(minClear)?Math.round(minClear):null};
+}
+function wpsFromCoords(coords){ return coords.map(([lon,lat],i)=>({name:`p${i+1}`,lat,lon})); }
+function smoothCoords(coords, alpha=0.3){
+  if(coords.length<=2) return coords;
+  const out = [coords[0]];
+  for(let i=1;i<coords.length-1;i++){
+    const a=coords[i-1], b=coords[i], c=coords[i+1];
+    out.push([ b[0] + alpha*( (a[0]+c[0])/2 - b[0] ), b[1] + alpha*( (a[1]+c[1])/2 - b[1] ) ]);
+  }
+  out.push(coords[coords.length-1]);
+  return out;
+}
+</script>
 
-
+<!-- =========================================
+= CHAPTER 05b: Click Waypoints (Start/End + RTH)
+========================================= -->
+<script>
 let clickMode = false;
 let clickPts = []; // [{lat,lon,name}]
 
@@ -292,7 +359,8 @@ $('btnClick').onclick = () => {
 };
 
 function onClickStart(e){
-  clickPts.push({ name:'Start', lat:e.lngLat.lat, lon:e.lngLat.lng });
+  clickPts = [{ name:'Start', lat:e.lngLat.lat, lon:e.lngLat.lng }];
+  drawClickPins(clickPts);
   map.once('click', onClickEnd);
 }
 function onClickEnd(e){
@@ -300,79 +368,21 @@ function onClickEnd(e){
   map.getCanvas().style.cursor = '';
   clickMode = false; $('btnClick').textContent = 'Click Start/End';
 
-  // Build waypoints with optional RTH
   const rth = $('chkRTH').checked;
   state.waypoints = rth ? [clickPts[0], clickPts[1], { ...clickPts[0], name:'RTH' }] : [...clickPts];
 
-  // Show in left panel
+  drawClickPins(state.waypoints);
   $('aiOut').textContent = JSON.stringify(state.waypoints, null, 2);
   $('validate').textContent = '✅ Waypoints from clicks.';
   flyTo(state.waypoints[0]);
 }
-let VEHICLE = null;
-(async ()=>{  // grab vehicle defaults on boot
-  const conf = await fetch('/api/config').then(r=>r.json());
-  VEHICLE = conf.vehicle || null;
-})();
+function flyTo(p){ map && map.flyTo({center:[p.lon,p.lat], zoom: 10}); }
+</script>
 
-$('btnEstimate').onclick = ()=>{
-  if(!VEHICLE){ $('batteryOut').textContent = "No vehicle config."; return; }
-  const payload = parseFloat($('payloadKg').value || "0");
-  const windMS  = parseFloat($('windMS').value || "0");
-
-  const cruise = VEHICLE.cruise_kmh || 95;
-  const effCruise = Math.max(5, cruise - (windMS*3.6)); // simple head/tail effect
-  const nominalRange = cruise * (VEHICLE.nominal_flight_time_hr || 4); // km
-
-  const dist = routeDistanceKm(state.waypoints); // km
-  const basePct = nominalRange>0 ? (dist / nominalRange) : 1;
-
-  // penalties
-  const payloadPenalty = Math.max(0, payload) * 0.05; // +5% per kg
-  const climbPenalty = 0; // TODO: compute from terrain samples
-  const totalPct = Math.min(1, basePct * (1 + payloadPenalty + climbPenalty));
-
-  const timeHr = effCruise>0 ? (dist / effCruise) : 0;
-  const estRemaining = Math.max(0, 1 - totalPct);
-
-  $('batteryOut').textContent =
-`Vehicle: ${VEHICLE.type} | Cruise ${cruise} km/h | Nominal ${VEHICLE.nominal_flight_time_hr} h
-Route distance: ${dist.toFixed(1)} km
-Effective cruise (wind): ${effCruise.toFixed(1)} km/h
-Flight time est: ${(timeHr*60).toFixed(0)} min
-Battery used: ${(totalPct*100).toFixed(0)}%   Remaining: ${(estRemaining*100).toFixed(0)}%`;
-};
-
-function kmToStr(km){ return km.toFixed(1) + " km"; }
-
-function lineSample(coords, n=80){
-  if(coords.length<2) return [];
-  const out=[];
-  for(let i=0;i<n;i++){
-    const t=i/(n-1);
-    const L=coords.length-1, s=t*L, k=Math.min(L-1, Math.floor(s)), u=s-k;
-    const a=coords[k], b=coords[k+1];
-    out.push([ a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u ]);
-  }
-  return out;
-}
-
-function clearanceStats(samples, cruise, buffer){
-  const supports = typeof map.queryTerrainElevation==='function' && map.getTerrain();
-  let bad=0, warn=0, minClear=Infinity;
-  for(let i=0;i<samples.length;i++){
-    const p = samples[i];
-    let elev=0;
-    if(supports) elev = map.queryTerrainElevation({lng:p[0],lat:p[1]}) ?? 0;
-    const cl = cruise - elev;
-    minClear = Math.min(minClear, cl);
-    if(!supports) continue;
-    if(cl < buffer) bad++; else if(cl < buffer*1.5) warn++;
-  }
-  return {bad,warn,minClear:isFinite(minClear)?Math.round(minClear):null};
-}
-
-/* -------- Helpers -------- */
+<!-- =========================================
+= CHAPTER 06b: Text Parsing (AI + heuristics + geocode)
+========================================= -->
+<script>
 function fromTextHeuristics(s){
   const out=[]; let m;
   const decRe=/([-+]?(\d{1,2}(?:\.\d+)?))\s*[, ]\s*([-+]?(?:1[0-7]\d|\d{1,2})(?:\.\d+)?)/g;
@@ -399,9 +409,8 @@ function validateWaypoints(list){
   }
   return {ok,msgs};
 }
-function flyTo(p){ map && map.flyTo({center:[p.lon,p.lat], zoom: 10}); }
 
-/* -------- Backend call with retry -------- */
+/* call to backend with 429 retry (from your file) */
 async function callParseAPI(payload, maxRetries=2){
   let attempt=0;
   while(true){
@@ -415,63 +424,8 @@ async function callParseAPI(payload, maxRetries=2){
     await new Promise(res=>setTimeout(res, (retryAfter?retryAfter*1000:1500*attempt)));
   }
 }
-function havDist(a,b){ // km, simple haversine
-  const R=6371, toRad=x=>x*Math.PI/180;
-  const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon);
-  const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(s1));
-}
-function routeDistanceKm(pts){
-  if(!pts || pts.length<2) return 0;
-  let d=0; for(let i=0;i<pts.length-1;i++) d+=havDist(pts[i],pts[i+1]); return d;
-}
 
-
-function routeCandidatesFromWaypoints(wps, opts){
-  const { cruise=120, buffer=30 } = opts||{};
-  if(!wps || wps.length<2) return [];
-
-  // base polyline (straight segments)
-  const coords = wps.map(w=>[w.lon,w.lat]);
-
-  // 1) shortest = the straight baseline
-  const shortest = { id:'shortest', label:'Shortest', color:'#60a5fa', coords:[...coords] };
-
-  // 2) safest (terrain-aware): same geometry but suggests higher cruise if needed
-  // (Detouring would require a pathfinder; this MVP bumps cruise for stats)
-  const safe = { id:'safest', label:'Safest', color:'#34d399', coords:[...coords], cruiseBoost: true };
-
-  // 3) efficient: favors fewer climbs (MVP = slight smoothing)
-  const efficient = { id:'efficient', label:'Efficient', color:'#f59e0b', coords:smoothCoords(coords, 0.25) };
-
-  // compute metrics for each
-  const list = [shortest,safe,efficient].map(r => {
-    const samples = lineSample(r.coords, 80);
-    const useCruise = r.cruiseBoost ? cruise + buffer : cruise;
-    const s = clearanceStats(samples, useCruise, buffer);
-    const distKm = routeDistanceKm(wpsFromCoords(r.coords));
-    return { ...r, stats:{ distKm, ...s, cruiseUsed: useCruise } };
-  });
-
-  return list;
-}
-
-function smoothCoords(coords, alpha=0.3){
-  if(coords.length<=2) return coords;
-  const out = [coords[0]];
-  for(let i=1;i<coords.length-1;i++){
-    const a=coords[i-1], b=coords[i], c=coords[i+1];
-    out.push([ b[0] + alpha*( (a[0]+c[0])/2 - b[0] ), b[1] + alpha*( (a[1]+c[1])/2 - b[1] ) ]);
-  }
-  out.push(coords[coords.length-1]);
-  return out;
-}
-
-function wpsFromCoords(coords){ return coords.map(([lon,lat],i)=>({name:`p${i+1}`,lat,lon})); }
-
-
-
-/* -------- Day 4: Parse -------- */
+/* Day 4: Parse button */
 $('btnSample').onclick = ()=>{ $('mission').value = "Fly to mountain lake"; };
 $('btnParse').onclick = async () => {
   const btn = $('btnParse');
@@ -493,10 +447,9 @@ $('btnParse').onclick = async () => {
       const { parsed } = await r.json();
       $('advOut').textContent = JSON.stringify(parsed, null, 2);
 
-      // 1) Use any AI targets with coords
       (parsed.targets || []).forEach(t => { if (typeof t.lat === "number" && typeof t.lon === "number") waypoints.push(t); });
 
-      // 2) Geocode name-only targets (cap to first 3 to be polite)
+      // Geocode name-only targets (cap to first 3)
       const nameOnly = (parsed.targets || []).filter(t => t?.name && (t.lat==null || t.lon==null)).slice(0,3);
       const lookups = await Promise.all(nameOnly.map(async t => {
         const q = t.name;
@@ -506,7 +459,6 @@ $('btnParse').onclick = async () => {
       lookups.filter(Boolean).forEach(t => waypoints.push(t));
 
     } else {
-      // Show error but continue with heuristics (raw coords)
       $('advOut').textContent = `OpenAI error → ${await r.text()}\n(using heuristics only)`;
     }
 
@@ -515,7 +467,7 @@ $('btnParse').onclick = async () => {
     state.waypoints = ok;
     $('aiOut').textContent = JSON.stringify(ok, null, 2);
     $('validate').innerHTML = (msgs.length? msgs.join('\n') : '✅ Looks good.') + `\nParsed ${ok.length} waypoint(s).`;
-    if (ok.length) flyTo(ok[0]);
+    if (ok.length) { drawClickPins(ok); flyTo(ok[0]); }
 
   } catch (e) {
     $('aiOut').textContent = String(e);
@@ -523,10 +475,12 @@ $('btnParse').onclick = async () => {
     btn.dataset.busy = '0'; btn.textContent = 'Parse with AI';
   }
 };
+</script>
 
-
-
-/* -------- Day 5: Route + safety coloring -------- */
+<!-- =========================================
+= CHAPTER 06c: Day 5 — Safety coloring route
+========================================= -->
+<script>
 $('btnRoute').onclick = ()=>{
   if(!map) return;
   if(state.waypoints.length<2){
@@ -538,7 +492,6 @@ $('btnRoute').onclick = ()=>{
   const cruise = parseFloat($('altitude').value)||120;
   const buffer = parseFloat($('buffer').value)||30;
 
-  // build samples and classify
   const coords = state.waypoints.map(wp=>[wp.lon,wp.lat]);
   const samples=60, pts=[];
   for(let i=0;i<samples;i++){
@@ -562,7 +515,6 @@ $('btnRoute').onclick = ()=>{
     else if(clearance < buffer*1.5){ yellow.push(seg); }
     else { green.push(seg); }
   }
-  // remove old layers
   for(const id of ['route-green','route-yellow','route-red','route-points']){
     if(map.getLayer(id)) map.removeLayer(id);
     if(map.getSource(id)) map.removeSource(id);
@@ -576,13 +528,11 @@ $('btnRoute').onclick = ()=>{
   addSeg('route-yellow', yellow, '#fbbf24');
   addSeg('route-red', red, '#f87171');
 
-  // markers
   const ptsFC = {type:'FeatureCollection',features:state.waypoints.map(w=>({type:'Feature',geometry:{type:'Point',coordinates:[w.lon,w.lat]},properties:{name:w.name}}))};
   map.addSource('route-points',{type:'geojson',data:ptsFC});
   map.addLayer({id:'route-points', type:'circle', source:'route-points',
     paint:{'circle-radius':5,'circle-color':'#4cc3ff','circle-stroke-color':'#001622','circle-stroke-width':2}});
 
-  // UI summary
   if(!supports){
     $('safety').innerHTML = `<span class="warn">Terrain API not active.</span> Route drawn (visual).`;
   }else{
@@ -592,5 +542,195 @@ $('btnRoute').onclick = ()=>{
   }
 };
 </script>
+
+<!-- =========================================
+= CHAPTER 08b: Multi-route generation & pickers
+========================================= -->
+<script>
+function routeCandidatesFromWaypoints(wps, opts){
+  const { cruise=120, buffer=30 } = opts||{};
+  if(!wps || wps.length<2) return [];
+
+  const coords = wps.map(w=>[w.lon,w.lat]);
+
+  const shortest = { id:'shortest', label:'Shortest', color:'#60a5fa', coords:[...coords] };
+  const safe     = { id:'safest',   label:'Safest',   color:'#34d399', coords:[...coords], cruiseBoost: true };
+  const efficient= { id:'efficient',label:'Efficient', color:'#f59e0b', coords:smoothCoords(coords, 0.25) };
+
+  const list = [shortest,safe,efficient].map(r => {
+    const samples = lineSample(r.coords, 80);
+    const useCruise = r.cruiseBoost ? cruise + buffer : cruise;
+    const s = clearanceStats(samples, useCruise, buffer);
+    const distKm = routeDistanceKm(wpsFromCoords(r.coords));
+    return { ...r, stats:{ distKm, ...s, cruiseUsed: useCruise } };
+  });
+
+  return list;
+}
+
+$('btnRoutes').onclick = ()=>{
+  if(!state.waypoints || state.waypoints.length<2){
+    alert('Need at least Start and End (click map or parse text).');
+    return;
+  }
+  const cruise = parseFloat($('altitude').value || '120');
+  const buffer = parseFloat($('buffer').value || '30');
+  const opts = routeCandidatesFromWaypoints(state.waypoints,{cruise,buffer});
+  state._candidates = opts;
+
+  clearRouteOptionLayers();
+  for(const r of opts) drawCandidate(r.id, r.coords, r.color);
+
+  const lines = [
+    'id        dist   minClr  bad/warn  cruiseUsed',
+    ...opts.map(r => `${r.id.padEnd(9)} ${kmToStr(r.stats.distKm).padEnd(6)} ${(r.stats.minClear??'-').toString().padEnd(6)}  ${String(r.stats.bad).padStart(2)}/${String(r.stats.warn).padEnd(2)}   ${r.stats.cruiseUsed}`)
+  ];
+  $('routesTable').textContent = lines.join('\n');
+};
+
+$('btnPickShortest').onclick = ()=>pickCandidate('shortest');
+$('btnPickSafe').onclick     = ()=>pickCandidate('safest');
+$('btnPickEfficient').onclick= ()=>pickCandidate('efficient');
+
+function pickCandidate(id){
+  const c = (state._candidates||[]).find(x=>x.id===id);
+  if(!c) return alert('Generate routes first.');
+  state.waypoints = wpsFromCoords(c.coords);
+  $('aiOut').textContent = JSON.stringify(state.waypoints,null,2);
+  $('validate').textContent = `✅ Using candidate: ${id}`;
+}
+</script>
+
+<!-- =========================================
+= CHAPTER 09b: Safety checks panel
+========================================= -->
+<script>
+let VEHICLE = null;
+(async ()=>{ VEHICLE = (await fetch('/api/config').then(r=>r.json())).vehicle || null; })();
+
+$('btnCheck').onclick = ()=>{
+  const out=[];
+  const minAlt = parseFloat($('minAlt').value || '0');
+  const cruise = parseFloat($('altitude').value || '120');
+  const buffer = parseFloat($('buffer').value || '30');
+
+  if(minAlt && cruise < minAlt){
+    out.push(`❌ Cruise altitude ${cruise}m < minimum ${minAlt}m`);
+  }else if(minAlt){ out.push(`✓ Min altitude satisfied: ${cruise}m ≥ ${minAlt}m`); }
+
+  if(!state.waypoints || state.waypoints.length<2){
+    out.push('❌ Need route waypoints'); $('safetyPanel').textContent = out.join('\n'); return;
+  }
+
+  const coords = state.waypoints.map(w=>[w.lon,w.lat]);
+  const samples = lineSample(coords, 80);
+  const stats = clearanceStats(samples, cruise, buffer);
+  if(stats.bad>0) out.push(`⚠️ Low-clearance segments: ${stats.bad} (min clr ${stats.minClear}m)`);
+  else out.push(`✓ Clearance OK. Min ${stats.minClear}m`);
+
+  const isRTH = state.waypoints.length>=3 &&
+                Math.abs(state.waypoints[0].lat - state.waypoints.at(-1).lat)<1e-6 &&
+                Math.abs(state.waypoints[0].lon - state.waypoints.at(-1).lon)<1e-6;
+  out.push(isRTH ? '✓ RTH present' : '⚠️ No Return-to-Home waypoint');
+
+  const VEH = VEHICLE || {cruise_kmh:95, nominal_flight_time_hr:4};
+  const distKm = routeDistanceKm(state.waypoints);
+  const basePct = (VEH.nominal_flight_time_hr>0) ? (distKm / (VEH.cruise_kmh*VEH.nominal_flight_time_hr)) : 1;
+  const used = Math.min(1, basePct);
+  if(used > 0.8) out.push(`⚠️ Battery usage high: ${(used*100).toFixed(0)}%`); else out.push('✓ Battery margin OK');
+
+  $('safetyPanel').textContent = out.join('\n');
+};
+</script>
+
+<!-- =========================================
+= CHAPTER 07b: Battery estimator (optional)
+========================================= -->
+<script>
+$('btnEstimate').onclick = ()=>{
+  if(!VEHICLE){ $('batteryOut').textContent = "No vehicle config."; return; }
+  const payload = parseFloat($('payloadKg').value || "0");
+  const windMS  = parseFloat($('windMS').value || "0");
+
+  const cruise = VEHICLE.cruise_kmh || 95;
+  const effCruise = Math.max(5, cruise - (windMS*3.6)); // headwind penalty
+  const nominalRange = cruise * (VEHICLE.nominal_flight_time_hr || 4); // km
+
+  const dist = routeDistanceKm(state.waypoints); // km
+  const basePct = nominalRange>0 ? (dist / nominalRange) : 1;
+
+  const payloadPenalty = Math.max(0, payload) * 0.05; // +5% per kg
+  const totalPct = Math.min(1, basePct * (1 + payloadPenalty));
+
+  const timeHr = effCruise>0 ? (dist / effCruise) : 0;
+  const estRemaining = Math.max(0, 1 - totalPct);
+
+  $('batteryOut').textContent =
+`Vehicle: ${VEHICLE.type} | Cruise ${cruise} km/h | Nominal ${VEHICLE.nominal_flight_time_hr} h
+Route distance: ${dist.toFixed(1)} km
+Effective cruise (wind): ${effCruise.toFixed(1)} km/h
+Flight time est: ${(timeHr*60).toFixed(0)} min
+Battery used: ${(totalPct*100).toFixed(0)}%   Remaining: ${(estRemaining*100).toFixed(0)}%`;
+};
+</script>
+
+<!-- =========================================
+= CHAPTER 10b: Export (MP WPL + QGC .plan)
+========================================= -->
+<script>
+function downloadBlob(filename, text){
+  const blob = new Blob([text], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+/* Mission Planner/QGC WPL 110 text */
+function toMissionPlannerWPL(wps, cruise){
+  let out = "QGC WPL 110\n";
+  wps.forEach((w,i)=>{
+    const idx=i, current=(i===0)?1:0, frame=3, cmd=16;
+    const p1=0,p2=0,p3=0,p4=0;
+    out += `${idx}\t${current}\t${frame}\t${cmd}\t${p1}\t${p2}\t${p3}\t${p4}\t${w.lat}\t${w.lon}\t${cruise}\t1\n`;
+  });
+  return out;
+}
+
+/* QGroundControl .plan v1 JSON */
+function toQGCPlanV1(wps, cruise){
+  const items = wps.map((w,i)=>({
+    AM: 1, command: 16, doJumpId: i+1, frame: 3,
+    params: [0,0,0,0, w.lat, w.lon, cruise], type: "SimpleItem"
+  }));
+  const plan = {
+    fileType: "Plan",
+    geoFence: { polygons: [] },
+    groundStation: "QGroundControl",
+    mission: {
+      cruiseSpeed: 15, firmwareType: 12, hoverSpeed: 5,
+      items, plannedHomePosition: [wps[0]?.lat||0, wps[0]?.lon||0, cruise],
+      vehicleType: 2, version: 2
+    },
+    rallyPoints: { points: [] },
+    version: 1
+  };
+  return JSON.stringify(plan, null, 2);
+}
+
+$('btnExport').onclick = ()=>{
+  if(!state.waypoints || state.waypoints.length===0){ alert('No waypoints to export.'); return; }
+  const fmt = $('exportFmt').value;
+  const cruise = parseFloat($('altitude').value || '120');
+  if(fmt==='mp'){
+    const txt = toMissionPlannerWPL(state.waypoints, cruise);
+    downloadBlob('mission.waypoints', txt);
+  }else{
+    const txt = toQGCPlanV1(state.waypoints, cruise);
+    downloadBlob('mission.plan', txt);
+  }
+};
+</script>
+
 </body>
 </html>
