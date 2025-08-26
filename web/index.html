@@ -99,6 +99,16 @@
       <div id="routesTable" class="kvs" style="margin-top:8px"></div>
     </div>
 
+    <div class="card">
+      <strong>Safety Checklist (Day 9)</strong>
+      <div class="row" style="margin-top:8px">
+        <input id="minAlt" placeholder="Min altitude AGL (m), e.g. 60" />
+        <button id="btnCheck">Run Checks</button>
+      </div>
+      <div id="safetyPanel" class="kvs" style="margin-top:8px"></div>
+    </div>
+
+
 
 
     <div class="card">
@@ -211,6 +221,45 @@ $('btnRoutes').onclick = ()=>{
   ];
   $('routesTable').textContent = lines.join('\n');
 };
+
+$('btnCheck').onclick = ()=>{
+  const out=[];
+  const minAlt = parseFloat($('minAlt').value || '0');
+  const cruise = parseFloat($('altitude').value || '120');
+  const buffer = parseFloat($('buffer').value || '30');
+
+  if(minAlt && cruise < minAlt){
+    out.push(`❌ Cruise altitude ${cruise}m < minimum ${minAlt}m`);
+  }else if(minAlt){ out.push(`✓ Min altitude satisfied: ${cruise}m ≥ ${minAlt}m`); }
+
+  if(!state.waypoints || state.waypoints.length<2){
+    out.push('❌ Need route waypoints'); $('safetyPanel').textContent = out.join('\n'); return;
+  }
+
+  // Terrain pass along current waypoints
+  const coords = state.waypoints.map(w=>[w.lon,w.lat]);
+  const samples = lineSample(coords, 80);
+  const stats = clearanceStats(samples, cruise, buffer);
+  if(stats.bad>0) out.push(`⚠️ Low-clearance segments: ${stats.bad} (min clr ${stats.minClear}m)`);
+  else out.push(`✓ Clearance OK. Min ${stats.minClear}m`);
+
+  // RTH (if 3 points with last == first)
+  const isRTH = state.waypoints.length>=3 &&
+                Math.abs(state.waypoints[0].lat - state.waypoints.at(-1).lat)<1e-6 &&
+                Math.abs(state.waypoints[0].lon - state.waypoints.at(-1).lon)<1e-6;
+  out.push(isRTH ? '✓ RTH present' : '⚠️ No Return-to-Home waypoint');
+
+  // Basic low-battery trigger using Day-7 calc (re-use estimator)
+  // (quick recompute using default inputs)
+  const VEH = VEHICLE || {cruise_kmh:95, nominal_flight_time_hr:4};
+  const distKm = routeDistanceKm(state.waypoints);
+  const basePct = (VEH.nominal_flight_time_hr>0) ? (distKm / (VEH.cruise_kmh*VEH.nominal_flight_time_hr)) : 1;
+  const used = Math.min(1, basePct);
+  if(used > 0.8) out.push(`⚠️ Battery usage high: ${(used*100).toFixed(0)}% (consider RTH earlier)`); else out.push('✓ Battery margin OK');
+
+  $('safetyPanel').textContent = out.join('\n');
+};
+
 
 // pickers
 $('btnPickShortest').onclick = ()=>pickCandidate('shortest');
