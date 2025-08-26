@@ -55,6 +55,12 @@
     </div>
 
     <div class="card">
+      <strong>Parsed Mission (advanced)</strong>
+      <div id="advOut" class="kvs"></div>
+    </div>
+
+
+    <div class="card">
       <strong>Route & Safety</strong>
       <div class="small">With terrain on, we check clearance along the path.</div>
       <div class="row" style="margin-top:8px">
@@ -62,6 +68,8 @@
         <input id="buffer" placeholder="Safety Buffer (m), e.g. 30" />
       </div>
       <div class="row" style="margin-top:8px">
+        <button id="btnClick">Click Start/End</button>
+        <label class="small"><input type="checkbox" id="chkRTH" checked /> Return to Home</label>
         <button id="btnRoute">Draw Route</button>
       </div>
       <div id="safety" class="small"></div>
@@ -143,6 +151,40 @@ function bootMap(){
   });
 }
 
+let clickMode = false;
+let clickPts = []; // [{lat,lon,name}]
+
+$('btnClick').onclick = () => {
+  clickMode = !clickMode;
+  $('btnClick').textContent = clickMode ? 'Click: ON (choose Start/End)' : 'Click Start/End';
+  if (!clickMode) return;
+  clickPts = [];
+  if (map) {
+    map.getCanvas().style.cursor = 'crosshair';
+    map.once('click', onClickStart);
+  }
+};
+
+function onClickStart(e){
+  clickPts.push({ name:'Start', lat:e.lngLat.lat, lon:e.lngLat.lng });
+  map.once('click', onClickEnd);
+}
+function onClickEnd(e){
+  clickPts.push({ name:'End', lat:e.lngLat.lat, lon:e.lngLat.lng });
+  map.getCanvas().style.cursor = '';
+  clickMode = false; $('btnClick').textContent = 'Click Start/End';
+
+  // Build waypoints with optional RTH
+  const rth = $('chkRTH').checked;
+  state.waypoints = rth ? [clickPts[0], clickPts[1], { ...clickPts[0], name:'RTH' }] : [...clickPts];
+
+  // Show in left panel
+  $('aiOut').textContent = JSON.stringify(state.waypoints, null, 2);
+  $('validate').textContent = '✅ Waypoints from clicks.';
+  flyTo(state.waypoints[0]);
+}
+
+
 /* -------- Helpers -------- */
 function fromTextHeuristics(s){
   const out=[]; let m;
@@ -189,45 +231,58 @@ async function callParseAPI(payload, maxRetries=2){
 
 /* -------- Day 4: Parse -------- */
 $('btnSample').onclick = ()=>{ $('mission').value = "Fly to mountain lake"; };
-$('btnParse').onclick = async ()=>{
-  const btn=$('btnParse'); if(btn.dataset.busy==='1') return;
-  btn.dataset.busy='1'; btn.textContent='Parsing…';
-  $('aiOut').textContent=''; $('validate').textContent='';
+$('btnParse').onclick = async () => {
+  const btn = $('btnParse');
+  if (btn.dataset.busy === '1') return;
+  btn.dataset.busy = '1'; btn.textContent = 'Parsing…';
+  $('aiOut').textContent = ''; $('validate').textContent = ''; $('advOut').textContent = '';
 
-  try{
-    const text=$('mission').value.trim();
-    let waypoints = fromTextHeuristics(text);
+  try {
+    const text = $('mission').value.trim();
+    let waypoints = fromTextHeuristics(text);  // raw coords in text
 
-    const r = await callParseAPI({
-      system: SYSTEM_PROMPT,
-      user: text
+    // Ask backend (OpenAI) for advanced parse
+    const r = await fetch('/api/parse', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ user: text })
     });
-    if(!r.ok){
-      // demo fallback on rate-limit / no quota
-      const msg = await r.text();
-      $('demoBadge').style.display='block';
-      const demo = { targets:[{name:"Mountain Lake (demo)", lat:37.59, lon:127.27}] };
-      $('aiOut').textContent = `API unavailable → using demo:\n${JSON.stringify(demo,null,2)}\n\nDetail:\n${msg}`;
-      waypoints = demo.targets;
-    }else{
-      $('demoBadge').style.display='none';
-      const data = await r.json();
-      const targets = data.targets||[];
-      waypoints.push(...targets);
-      $('aiOut').textContent = JSON.stringify(waypoints,null,2);
+
+    if (r.ok) {
+      const { parsed } = await r.json();
+      $('advOut').textContent = JSON.stringify(parsed, null, 2);
+
+      // 1) Use any AI targets with coords
+      (parsed.targets || []).forEach(t => { if (typeof t.lat === "number" && typeof t.lon === "number") waypoints.push(t); });
+
+      // 2) Geocode name-only targets (cap to first 3 to be polite)
+      const nameOnly = (parsed.targets || []).filter(t => t?.name && (t.lat==null || t.lon==null)).slice(0,3);
+      const lookups = await Promise.all(nameOnly.map(async t => {
+        const q = t.name;
+        const g = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`).then(x=>x.json()).catch(()=>({ok:false}));
+        return g.ok ? { name: q, lat: g.lat, lon: g.lon } : null;
+      }));
+      lookups.filter(Boolean).forEach(t => waypoints.push(t));
+
+    } else {
+      // Show error but continue with heuristics (raw coords)
+      $('advOut').textContent = `OpenAI error → ${await r.text()}\n(using heuristics only)`;
     }
 
-    const {ok,msgs}=validateWaypoints(waypoints);
+    // Validate + render
+    const { ok, msgs } = validateWaypoints(waypoints);
     state.waypoints = ok;
+    $('aiOut').textContent = JSON.stringify(ok, null, 2);
     $('validate').innerHTML = (msgs.length? msgs.join('\n') : '✅ Looks good.') + `\nParsed ${ok.length} waypoint(s).`;
-    if(ok.length) flyTo(ok[0]);
+    if (ok.length) flyTo(ok[0]);
 
-  }catch(e){
+  } catch (e) {
     $('aiOut').textContent = String(e);
-  }finally{
-    btn.dataset.busy='0'; btn.textContent='Parse with AI';
+  } finally {
+    btn.dataset.busy = '0'; btn.textContent = 'Parse with AI';
   }
 };
+
+
 
 /* -------- Day 5: Route + safety coloring -------- */
 $('btnRoute').onclick = ()=>{
