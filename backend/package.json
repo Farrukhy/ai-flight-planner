@@ -1,14 +1,29 @@
 {
   "name": "ai-flight-planner-backend",
-  "private": true,
+  "version": "1.0.0",
+  "description": "AI Flight Planner backend for Mission Planner integration",
   "type": "module",
+  "main": "server.js",
   "scripts": {
+    "dev": "cross-env NODE_ENV=development node server.js",
     "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": ["flight", "planner", "ai", "vtol", "mission", "waypoints"],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "node-fetch": "^3.3.2"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
